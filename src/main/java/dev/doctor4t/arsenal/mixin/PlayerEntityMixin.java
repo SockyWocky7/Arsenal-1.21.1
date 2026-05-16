@@ -1,0 +1,113 @@
+package dev.doctor4t.arsenal.mixin;
+
+import dev.doctor4t.arsenal.entity.AnchorbladeEntity;
+import dev.doctor4t.arsenal.index.ArsenalStatusEffects;
+import dev.doctor4t.arsenal.item.AnchorbladeItem;
+import dev.doctor4t.arsenal.item.ScytheItem;
+import dev.doctor4t.arsenal.util.AnchorOwner;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.data.TrackedData;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
+import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.registry.tag.FluidTags;
+import net.minecraft.util.Hand;
+import net.minecraft.world.World;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+@SuppressWarnings("WrongEntityDataParameterClass")
+@Mixin(PlayerEntity.class)
+public abstract class PlayerEntityMixin extends LivingEntity implements AnchorOwner {
+
+    @Unique
+    private static final TrackedData<Integer> BASIC_ANCHOR_MAIN = DataTracker.registerData(PlayerEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    @Unique
+    private static final TrackedData<Integer> REELING_ANCHOR_MAIN = DataTracker.registerData(PlayerEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    @Unique
+    private static final TrackedData<Integer> BASIC_ANCHOR_OFF = DataTracker.registerData(PlayerEntity.class, TrackedDataHandlerRegistry.INTEGER);
+    @Unique
+    private static final TrackedData<Integer> REELING_ANCHOR_OFF = DataTracker.registerData(PlayerEntity.class, TrackedDataHandlerRegistry.INTEGER);
+
+    protected PlayerEntityMixin(EntityType<? extends LivingEntity> entityType, World world) {
+        super(entityType, world);
+    }
+
+    @Shadow
+    public abstract float getAttackCooldownProgress(float baseTime);
+
+    // In MC 1.21.1 disableShield takes no parameters: disableShield()V
+    // The old signature disableShield(boolean sprinting) no longer exists.
+    @Shadow
+    public abstract void disableShield();
+
+    @Inject(method = "initDataTracker", at = @At("TAIL"))
+    private void arsenal$initDataTracker(DataTracker.Builder builder, CallbackInfo ci) {
+        builder.add(BASIC_ANCHOR_MAIN, -1);
+        builder.add(REELING_ANCHOR_MAIN, -1);
+        builder.add(BASIC_ANCHOR_OFF, -1);
+        builder.add(REELING_ANCHOR_OFF, -1);
+    }
+
+    @Inject(method = "getBlockBreakingSpeed", at = @At("RETURN"), cancellable = true)
+    public void arsenal$multiplyAnchorbladeMiningSpeedUnderwater(BlockState block, CallbackInfoReturnable<Float> cir) {
+        if (this.getMainHandStack().getItem() instanceof AnchorbladeItem && this.isSubmergedIn(FluidTags.WATER)) {
+            cir.setReturnValue(cir.getReturnValue() * 2f);
+        }
+    }
+
+    @Inject(method = "attack", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/player/PlayerEntity;addCritParticles(Lnet/minecraft/entity/Entity;)V"))
+    private void arsenal$scytheReelTargetOnCrit(Entity target, CallbackInfo ci) {
+        if (this.getStackInHand(Hand.MAIN_HAND).getItem() instanceof ScytheItem) {
+            float strength = 1f;
+            if (target instanceof LivingEntity livingEntity) {
+                strength = (float) (.25f * (1.0 - livingEntity.getAttributeValue(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE)));
+                livingEntity.addStatusEffect(new StatusEffectInstance(ArsenalStatusEffects.STUN, 10, 0, false, false, false));
+            }
+            target.setVelocity(this.getPos().subtract(target.getPos()).multiply(strength));
+            target.velocityModified = true;
+        }
+    }
+
+    @Inject(method = "takeShieldHit", at = @At("HEAD"))
+    protected void arsenal$scytheDisableShield(LivingEntity attacker, CallbackInfo ci) {
+        if (attacker.getMainHandStack().getItem() instanceof ScytheItem) {
+            this.disableShield();
+        }
+    }
+
+    @Override
+    public void arsenal$setAnchor(Hand hand, AnchorbladeEntity anchor) {
+        boolean reeling = anchor.hasReeling();
+        if (hand == Hand.MAIN_HAND) {
+            this.dataTracker.set(reeling ? REELING_ANCHOR_MAIN : BASIC_ANCHOR_MAIN, anchor.getId());
+        } else {
+            this.dataTracker.set(reeling ? REELING_ANCHOR_OFF : BASIC_ANCHOR_OFF, anchor.getId());
+        }
+    }
+
+    @Override
+    public AnchorbladeEntity arsenal$getAnchor(Hand hand, boolean reeling) {
+        if (hand == Hand.MAIN_HAND) {
+            return this.getWorld().getEntityById(reeling ? this.dataTracker.get(REELING_ANCHOR_MAIN) : this.dataTracker.get(BASIC_ANCHOR_MAIN)) instanceof AnchorbladeEntity anchor ? anchor : null;
+        } else {
+            return this.getWorld().getEntityById(reeling ? this.dataTracker.get(REELING_ANCHOR_OFF) : this.dataTracker.get(BASIC_ANCHOR_OFF)) instanceof AnchorbladeEntity anchor ? anchor : null;
+        }
+    }
+
+    @Override
+    public boolean arsenal$isAnchorActive(Hand hand, boolean reeling) {
+        AnchorbladeEntity anchor = this.arsenal$getAnchor(hand, reeling);
+        return anchor != null && anchor.isAlive();
+    }
+}

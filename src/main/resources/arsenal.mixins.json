@@ -1,0 +1,39 @@
+{
+  "required": true,
+  "package": "dev.doctor4t.arsenal.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "DrownedEntityMixin",
+    "EntityMixin",
+    "FireChargeItemMixin",
+    "ItemMixin",
+    "MobEntityMixin",
+    "PersistentProjectileEntityMixin",
+    "PlayerEntityMixin",
+    "PlayerInventoryMixin",
+    "PlayerScreenHandlerMixin",
+    "ProjectileEntityMixin",
+    "ServerPlayNetworkHandlerMixin",
+    "TridentItemMixin",
+    "VindicatorEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "client": [
+    "HandledScreenMixin",
+    "accessors.CreativeSlotAccessor",
+    "client.BuiltinModelItemRendererMixin",
+    "client.CapeFeatureRendererMixin",
+    "client.CreativeInventoryScreenMixin",
+    "client.DrawContextMixin",
+    "client.HeldItemFeatureRendererMixin",
+    "client.HeldItemRendererMixin",
+    "client.InGameHudMixin",
+    "client.InventoryScreenMixin",
+    "client.ItemEntityRendererMixin",
+    "client.ItemRendererMixin",
+    "client.MinecraftClientMixin",
+    "client.PlayerEntityRendererMixin"
+  ]
+}
