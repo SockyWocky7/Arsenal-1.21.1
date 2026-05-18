@@ -1,3 +1,6 @@
+# NOTE:
+## I did NOT make this mod. i simply made a port to 1.21.1 based off of the 1.20.1 version.
+
 <div align="center">
   <h1>Arsenal</h1>
   
